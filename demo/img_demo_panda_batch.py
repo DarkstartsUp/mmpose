@@ -2,7 +2,7 @@ import os
 import json
 from argparse import ArgumentParser
 from PIL import Image
-from mmpose.apis import inference_pose_model, init_pose_model, vis_pose_result
+from mmpose.apis import inference_top_down_pose_model, init_pose_model
 
 SCENE_NAMES = [
     '1-HIT_Canteen_frames',
@@ -67,7 +67,7 @@ def main():
                                           int(height * 100 / 110)]]
 
                         # pose estimate on a single image.
-                        pose_results = inference_pose_model(
+                        pose_results = inference_top_down_pose_model(
                             pose_model, img_path, person_bboxes, format='xywh')
                         buffer.append(pose_results[0]['keypoints'].tolist())
                     save_dict[pid].append(buffer)

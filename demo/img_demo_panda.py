@@ -2,7 +2,7 @@ import os
 import json
 from argparse import ArgumentParser
 from PIL import Image
-from mmpose.apis import inference_pose_model, init_pose_model, vis_pose_result
+from mmpose.apis import inference_top_down_pose_model, init_pose_model, vis_pose_result
 
 
 def main():
@@ -59,7 +59,7 @@ def main():
         person_bboxes.append([int(width * 5 / 110), int(height * 5 / 110), int(width * 100 / 110), int(height * 100 / 110)])
 
         # test a single image, with a list of bboxes.
-        pose_results = inference_pose_model(
+        pose_results = inference_top_down_pose_model(
             pose_model, img_path, person_bboxes, format='xywh')
         print(len(pose_results[0]['keypoints'].tolist()))
         save_list.append(pose_results[0]['keypoints'].tolist())
@@ -70,14 +70,13 @@ def main():
             out_file = os.path.join(args.out_img_root, f'vis_{i}.jpg')
 
         # show the results
-        # vis_pose_result(
-        #     pose_model,
-        #     img_path,
-        #     pose_results,
-        #     skeleton=skeleton,
-        #     kpt_score_thr=args.kpt_thr,
-        #     show=args.show,
-        #     out_file=out_file)
+        vis_pose_result(
+            pose_model,
+            img_path,
+            pose_results,
+            kpt_score_thr=args.kpt_thr,
+            show=args.show,
+            out_file=out_file)
     json_string = json.dumps(save_list, indent=2)
     with open(os.path.join(args.out_img_root, 'results.json'), "w") as f:
         f.write(json_string)
