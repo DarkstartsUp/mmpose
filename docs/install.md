@@ -7,14 +7,15 @@
 - PyTorch 1.3+
 - CUDA 9.2+ (If you build PyTorch from source, CUDA 9.0 is also compatible)
 - GCC 5+
-- [mmcv](https://github.com/open-mmlab/mmcv) v1.0rc0+
+- [mmcv](https://github.com/open-mmlab/mmcv) (Please install the latest version)
 - Numpy
 - cv2
 - json_tricks
+- [xtcocotools](https://github.com/jin-s13/xtcocoapi)
 
 Optional:
 - [mmdet](https://github.com/open-mmlab/mmdetection) (to run demos)
-- pycocotools (to train/test on COCO Dataset)
+
 
 ### Install mmpose
 
@@ -48,12 +49,12 @@ you need to install the prebuilt PyTorch with CUDA 9.2.
 conda install pytorch=1.3.1 cudatoolkit=9.2 torchvision=0.4.2 -c pytorch
 ```
 
-If you build PyTorch from source instead of installing the prebuilt pacakge, you can use more CUDA versions such as 9.0.
+If you build PyTorch from source instead of installing the prebuilt package, you can use more CUDA versions such as 9.0.
 
 c. Clone the mmpose repository
 
 ```shell
-git clone git@gitlab.sz.sensetime.com:open-mmlab/mmpose.git
+git clone git@github.com:open-mmlab/mmpose.git
 cd mmpose
 ```
 
@@ -62,7 +63,6 @@ d. Install build requirements and then install mmpose
 
 ```shell
 pip install -r requirements.txt
-pip install "git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI"
 python setup.py develop
 ```
 
@@ -85,10 +85,9 @@ conda create -n open-mmlab python=3.7 -y
 conda activate open-mmlab
 
 conda install -c pytorch pytorch torchvision -y
-git clone git@gitlab.sz.sensetime.com:open-mmlab/mmpose.git
+git clone git@github.com:open-mmlab/mmpose.git
 cd mmpose
 pip install -r requirements.txt
-pip install "git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI"
 python setup.py develop
 
 ```

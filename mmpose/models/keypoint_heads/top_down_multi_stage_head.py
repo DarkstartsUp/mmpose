@@ -57,12 +57,16 @@ class TopDownMultiStageHead(nn.Module):
                     f'num_deconv_layers ({num_deconv_layers}) should >= 0.')
             self.multi_deconv_layers.append(deconv_layers)
 
+        identity_final_layer = False
         if extra is not None and 'final_conv_kernel' in extra:
-            assert extra['final_conv_kernel'] in [1, 3]
+            assert extra['final_conv_kernel'] in [0, 1, 3]
             if extra['final_conv_kernel'] == 3:
                 padding = 1
-            else:
+            elif extra['final_conv_kernel'] == 1:
                 padding = 0
+            else:
+                # 0 for Identity mapping.
+                identity_final_layer = True
             kernel_size = extra['final_conv_kernel']
         else:
             kernel_size = 1
@@ -71,18 +75,25 @@ class TopDownMultiStageHead(nn.Module):
         # build multi-stage final layers
         self.multi_final_layers = nn.ModuleList([])
         for i in range(self.num_stages):
-            final_layer = build_conv_layer(
-                cfg=dict(type='Conv2d'),
-                in_channels=num_deconv_filters[-1]
-                if num_deconv_layers > 0 else in_channels,
-                out_channels=out_channels,
-                kernel_size=kernel_size,
-                stride=1,
-                padding=padding)
+            if identity_final_layer:
+                final_layer = nn.Identity()
+            else:
+                final_layer = build_conv_layer(
+                    cfg=dict(type='Conv2d'),
+                    in_channels=num_deconv_filters[-1]
+                    if num_deconv_layers > 0 else in_channels,
+                    out_channels=out_channels,
+                    kernel_size=kernel_size,
+                    stride=1,
+                    padding=padding)
             self.multi_final_layers.append(final_layer)
 
     def forward(self, x):
-        # return a list of heatmaps from multiple stages.
+        """Forward function.
+
+        Returns:
+            out (list[Tensor]): a list of heatmaps from multiple stages.
+        """
         out = []
         assert isinstance(x, list)
         for i in range(self.num_stages):
@@ -92,6 +103,7 @@ class TopDownMultiStageHead(nn.Module):
         return out
 
     def _make_deconv_layer(self, num_layers, num_filters, num_kernels):
+        """Make deconv layers."""
         if num_layers != len(num_filters):
             error_msg = f'num_layers({num_layers}) ' \
                         f'!= length of num_filters({len(num_filters)})'
@@ -124,6 +136,7 @@ class TopDownMultiStageHead(nn.Module):
         return nn.Sequential(*layers)
 
     def _get_deconv_cfg(self, deconv_kernel):
+        """Get configurations for deconv layers."""
         if deconv_kernel == 4:
             padding = 1
             output_padding = 0
@@ -139,6 +152,7 @@ class TopDownMultiStageHead(nn.Module):
         return deconv_kernel, padding, output_padding
 
     def init_weights(self):
+        """Initialize model weights."""
         for name, m in self.multi_deconv_layers.named_modules():
             if isinstance(m, nn.ConvTranspose2d):
                 normal_init(m, std=0.001)

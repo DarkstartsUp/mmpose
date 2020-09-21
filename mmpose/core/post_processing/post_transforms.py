@@ -21,7 +21,10 @@ def fliplr_joints(joints_3d, joints_3d_visible, img_width, flip_pairs):
             (for example, left ear -- right ear).
 
     Returns:
-        joints_3d_flipped, joints_3d_visible_flipped
+        tuple: Flipped human joints.
+
+        - joints_3d_flipped (np.ndarray([K, 3])): Flipped joints.
+        - joints_3d_visible_flipped (np.ndarray([K, 1])): Joint visibility.
     """
 
     assert len(joints_3d) == len(joints_3d_visible)
@@ -55,13 +58,13 @@ def flip_back(output_flipped, flip_pairs):
         heatmap width: W
 
     Args:
-        ouput_flipped (np.ndarray[N, K, H, W]): The output heatmaps obtained
+        output_flipped (np.ndarray[N, K, H, W]): The output heatmaps obtained
             from the flipped images.
         flip_pairs (list[tuple()): Pairs of keypoints which are mirrored
             (for example, left ear -- right ear).
 
     Returns:
-        output_flipped_back: heatmaps that flipped back to the original image
+        np.ndarray: heatmaps that flipped back to the original image
     """
     assert output_flipped.ndim == 4, \
         'output_flipped should be [batch_size, num_keypoints, height, width]'
@@ -93,21 +96,21 @@ def transform_preds(coords, center, scale, output_size):
         coords (np.ndarray[K, ndims]):
             if ndims=2, corrds are predicted keypoint location.
             if ndims=5, corrds are composed of (x, y, tags,
-                fliped_tags, scores)
+                flipped_tags, scores)
         center (np.ndarray[2, ]): Center of the bounding box (x, y).
         scale (np.ndarray[2, ]): Scale of the bounding box
             wrt [width, height].
         output_size (np.ndarray[2, ]): Size of the destination heatmaps.
 
     Returns:
-        target_coords: predicted coordinates in the images.
+        np.ndarray: Predicted coordinates in the images.
     """
     assert coords.shape[1] == 2 or coords.shape[1] == 5
     assert len(center) == 2
     assert len(scale) == 2
     assert len(output_size) == 2
 
-    target_coords = np.zeros_like(coords)
+    target_coords = coords.copy()
     trans = get_affine_transform(center, scale, 0, output_size, inv=True)
     for p in range(coords.shape[0]):
         target_coords[p, 0:2] = affine_transform(coords[p, 0:2], trans)
@@ -134,7 +137,7 @@ def get_affine_transform(center,
             (inv=False: src->dst or inv=True: dst->src)
 
     Returns:
-        trans: the transform matrix.
+        np.ndarray: The transform matrix.
     """
     assert len(center) == 2
     assert len(scale) == 2

@@ -23,6 +23,7 @@ class TopDownRandomFlip():
         self.flip_prob = flip_prob
 
     def __call__(self, results):
+        """Perform data augmentation with random image flip."""
         img = results['img']
         joints_3d = results['joints_3d']
         joints_3d_visible = results['joints_3d_visible']
@@ -65,6 +66,7 @@ class TopDownHalfBodyTransform():
 
     @staticmethod
     def half_body_transform(cfg, joints_3d, joints_3d_visible):
+        """Get center&scale for half-body transform."""
         upper_joints = []
         lower_joints = []
         for joint_id in range(cfg['num_joints']):
@@ -106,6 +108,7 @@ class TopDownHalfBodyTransform():
         return center, scale
 
     def __call__(self, results):
+        """Perform data augmentation with half-body transform."""
         joints_3d = results['joints_3d']
         joints_3d_visible = results['joints_3d_visible']
 
@@ -140,6 +143,7 @@ class TopDownGetRandomScaleRotation():
         self.rot_prob = rot_prob
 
     def __call__(self, results):
+        """Perform data augmentation with random scaling & rotating."""
         s = results['scale']
 
         sf = self.scale_factor
@@ -217,16 +221,20 @@ class TopDownGenerateTarget():
 
         Args:
             cfg (dict): data config
-            joints_3d: np.ndarray([num_joints, 3])
-            joints_3d_visible: np.ndarray([num_joints, 3])
+            joints_3d: np.ndarray ([num_joints, 3])
+            joints_3d_visible: np.ndarray ([num_joints, 3])
+
         Returns:
-             target, target_weight(1: visible, 0: invisible)
+            tuple: A tuple containing targets.
+
+            - target: Target heatmaps.
+            - target_weight: (1: visible, 0: invisible)
         """
         num_joints = cfg['num_joints']
         image_size = cfg['image_size']
         heatmap_size = cfg['heatmap_size']
-        joints_weight = cfg['joints_weight']
-        use_different_joints_weight = cfg['use_different_joints_weight']
+        joint_weights = cfg['joint_weights']
+        use_different_joint_weights = cfg['use_different_joint_weights']
 
         target_weight = np.zeros((num_joints, 1), dtype=np.float32)
         target = np.zeros((num_joints, heatmap_size[1], heatmap_size[0]),
@@ -294,12 +302,13 @@ class TopDownGenerateTarget():
                     target[joint_id][img_y[0]:img_y[1], img_x[0]:img_x[1]] = \
                         g[g_y[0]:g_y[1], g_x[0]:g_x[1]]
 
-        if use_different_joints_weight:
-            target_weight = np.multiply(target_weight, joints_weight)
+        if use_different_joint_weights:
+            target_weight = np.multiply(target_weight, joint_weights)
 
         return target, target_weight
 
     def __call__(self, results):
+        """Generate the target heatmap."""
         joints_3d = results['joints_3d']
         joints_3d_visible = results['joints_3d_visible']
 

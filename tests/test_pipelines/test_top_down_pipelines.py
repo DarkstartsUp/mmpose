@@ -4,11 +4,12 @@ import os.path as osp
 import numpy as np
 import torch
 from numpy.testing import assert_array_almost_equal
-from pycocotools.coco import COCO
+from xtcocotools.coco import COCO
 
 from mmpose.datasets.pipelines import (Collect, LoadImageFromFile,
                                        NormalizeTensor, TopDownAffine,
                                        TopDownGenerateTarget,
+                                       TopDownGetRandomScaleRotation,
                                        TopDownHalfBodyTransform,
                                        TopDownRandomFlip, ToTensor)
 
@@ -64,9 +65,9 @@ def _box2cs(box, image_size):
     return center, scale
 
 
-def test_pipeline():
+def test_top_down_pipeline():
     # test loading
-    data_prefix = 'tests/data/'
+    data_prefix = 'tests/data/coco/'
     ann_file = osp.join(data_prefix, 'test_coco.json')
     coco = COCO(ann_file)
 
@@ -82,8 +83,8 @@ def test_pipeline():
     ann = coco.anns[ann_ids[0]]
 
     num_joints = 17
-    joints_3d = np.zeros((num_joints, 3), dtype=np.float)
-    joints_3d_visible = np.zeros((num_joints, 3), dtype=np.float)
+    joints_3d = np.zeros((num_joints, 3), dtype=np.float32)
+    joints_3d_visible = np.zeros((num_joints, 3), dtype=np.float32)
     for ipt in range(num_joints):
         joints_3d[ipt, 0] = ann['keypoints'][ipt * 3 + 0]
         joints_3d[ipt, 1] = ann['keypoints'][ipt * 3 + 1]
@@ -109,8 +110,8 @@ def test_pipeline():
     results['ann_info']['num_joints'] = num_joints
     results['ann_info']['upper_body_ids'] = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
     results['ann_info']['lower_body_ids'] = (11, 12, 13, 14, 15, 16)
-    results['ann_info']['use_different_joints_weight'] = False
-    results['ann_info']['joints_weight'] = np.array([
+    results['ann_info']['use_different_joint_weights'] = False
+    results['ann_info']['joint_weights'] = np.array([
         1., 1., 1., 1., 1., 1., 1., 1.2, 1.2, 1.5, 1.5, 1., 1., 1.2, 1.2, 1.5,
         1.5
     ],
@@ -123,6 +124,14 @@ def test_pipeline():
     random_flip = TopDownRandomFlip(flip_prob=1.)
     results_flip = random_flip(copy.deepcopy(results))
     assert _check_flip(results['img'], results_flip['img'])
+
+    # test random scale and rotate
+    random_scale_rotate = TopDownGetRandomScaleRotation(90, 0.3, 1.0)
+    results_scale_rotate = random_scale_rotate(copy.deepcopy(results))
+    assert results_scale_rotate['rotation'] <= 180
+    assert results_scale_rotate['rotation'] >= -180
+    assert (results_scale_rotate['scale'] / results['scale'] <= 1.3).all()
+    assert (results_scale_rotate['scale'] / results['scale'] >= 0.7).all()
 
     # test halfbody transform
     halfbody_transform = TopDownHalfBodyTransform(

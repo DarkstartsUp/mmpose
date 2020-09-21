@@ -11,7 +11,9 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
+import subprocess
 import sys
+
 sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
@@ -21,8 +23,16 @@ copyright = '2020, MMPose Authors'
 author = 'MMPose Authors'
 
 # The full version, including alpha/beta/rc tags
-with open('../mmpose/VERSION', 'r') as f:
-    release = f.read().strip()
+version_file = '../mmpose/version.py'
+
+
+def get_version():
+    with open(version_file, 'r') as f:
+        exec(compile(f.read(), version_file, 'exec'))
+    return locals()['__version__']
+
+
+release = get_version()
 
 # -- General configuration ---------------------------------------------------
 
@@ -61,3 +71,11 @@ html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
 master_doc = 'index'
+
+
+def builder_inited_handler(app):
+    subprocess.run(['./merge_docs.sh'])
+
+
+def setup(app):
+    app.connect('builder-inited', builder_inited_handler)

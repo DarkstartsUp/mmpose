@@ -21,9 +21,11 @@ def _get_multi_scale_size(image, input_size, current_scale, min_scale):
         min_scale (float): Minimal scale.
 
     Returns:
-        (w_resized, h_resized) (tuple(int)): resized width/height
-        center (np.ndarray)image center
-        scale (np.ndarray): scales wrt width/height
+        tuple: A tuple containing multi-scale sizes.
+
+        - (w_resized, h_resized) (tuple(int)): resized width/height
+        - center (np.ndarray)image center
+        - scale (np.ndarray): scales wrt width/height
     """
     h, w, _ = image.shape
 
@@ -59,9 +61,11 @@ def _resize_align_multi_scale(image, input_size, current_scale, min_scale):
         min_scale (float): Minimal scale
 
     Returns:
-        image_resized (tuple): size of resize image
-        center (np.ndarray): center of image
-        scale (np.ndarray): scale
+        tuple: A tuple containing image info.
+
+        - image_resized (tuple): size of resize image
+        - center (np.ndarray): center of image
+        - scale (np.ndarray): scale
     """
     size_resized, center, scale = _get_multi_scale_size(
         image, input_size, current_scale, min_scale)
@@ -94,6 +98,7 @@ class HeatmapGenerator():
         self.g = np.exp(-((x - x0)**2 + (y - y0)**2) / (2 * sigma**2))
 
     def __call__(self, joints):
+        """Generate heatmaps."""
         hms = np.zeros((self.num_joints, self.output_res, self.output_res),
                        dtype=np.float32)
         sigma = self.sigma
@@ -146,32 +151,33 @@ class JointsEncoder():
             number of people in image: N
             number of keypoints: K
             max number of people in an image: M
+
         Args:
             joints (np.ndarray[NxKx3])
 
         Returns:
             visible_kpts (np.ndarray[MxKx2]).
         """
-        visible_kpts = np.zeros((self.max_num_people, self.num_joints, 2))
+        visible_kpts = np.zeros((self.max_num_people, self.num_joints, 2),
+                                dtype=np.float32)
         output_res = self.output_res
         for i in range(len(joints)):
             tot = 0
             for idx, pt in enumerate(joints[i]):
                 x, y = int(pt[0]), int(pt[1])
-                if pt[2] > 0 and x >= 0 and y >= 0 \
-                   and x < self.output_res and y < self.output_res:
+                if (pt[2] > 0 and x >= 0 and y >= 0 and x < self.output_res
+                        and y < self.output_res):
                     if self.tag_per_joint:
                         visible_kpts[i][tot] = \
                             (idx * output_res**2 + y * output_res + x, 1)
                     else:
-                        visible_kpts[i][tot] = \
-                            (y * output_res + x, 1)
+                        visible_kpts[i][tot] = (y * output_res + x, 1)
                     tot += 1
         return visible_kpts
 
 
 @PIPELINES.register_module()
-class BottomUpRandomFlip(object):
+class BottomUpRandomFlip:
     """Data augmentation with random image flip for bottom-up.
 
     Args:
@@ -182,6 +188,7 @@ class BottomUpRandomFlip(object):
         self.flip_prob = flip_prob
 
     def __call__(self, results):
+        """Perform data augmentation with random image flip."""
         image, mask, joints = results['img'], results['mask'], results[
             'joints']
         self.flip_index = results['ann_info']['flip_index']
@@ -204,13 +211,13 @@ class BottomUpRandomFlip(object):
 
 
 @PIPELINES.register_module()
-class BottomUpRandomAffine(object):
-    """Data augmentation  with random scaling & rotating.
+class BottomUpRandomAffine:
+    """Data augmentation with random scaling & rotating.
 
     Args:
         rot_factor (int): Rotating to [-rotation_factor, rotation_factor]
         scale_factor (float): Scaling to [1-scale_factor, 1+scale_factor]
-        scale_tyle: wrt ``long'' or ``short'' length of the image.
+        scale_type: wrt ``long'' or ``short'' length of the image.
         trans_factor: Translation factor.
         scale_aware_sigma: Option to use scale-aware sigma
     """
@@ -223,17 +230,17 @@ class BottomUpRandomAffine(object):
         self.trans_factor = trans_factor
 
     def _get_affine_matrix(self, center, scale, res, rot=0):
-        # Generate transformation matrix
+        """Generate transformation matrix."""
         h = scale
-        t = np.zeros((3, 3))
+        t = np.zeros((3, 3), dtype=np.float32)
         t[0, 0] = float(res[1]) / h
         t[1, 1] = float(res[0]) / h
         t[0, 2] = res[1] * (-float(center[0]) / h + .5)
         t[1, 2] = res[0] * (-float(center[1]) / h + .5)
         t[2, 2] = 1
-        if not rot == 0:
+        if rot != 0:
             rot = -rot  # To match direction of rotation from cropping
-            rot_mat = np.zeros((3, 3))
+            rot_mat = np.zeros((3, 3), dtype=np.float32)
             rot_rad = rot * np.pi / 180
             sn, cs = np.sin(rot_rad), np.cos(rot_rad)
             rot_mat[0, :2] = [cs, -sn]
@@ -249,7 +256,7 @@ class BottomUpRandomAffine(object):
         return t
 
     def _affine_joints(self, joints, mat):
-        # Affine the joints by the transform matrix.
+        """Affine the joints by the transform matrix."""
         joints = np.array(joints)
         shape = joints.shape
         joints = joints.reshape(-1, 2)
@@ -258,6 +265,7 @@ class BottomUpRandomAffine(object):
             mat.T).reshape(shape)
 
     def __call__(self, results):
+        """Perform data augmentation with random scaling & rotating."""
         image, mask, joints = results['img'], results['mask'], results[
             'joints']
 
@@ -279,7 +287,7 @@ class BottomUpRandomAffine(object):
         elif self.scale_type == 'short':
             scale = min(height, width) / 1.0
         else:
-            raise ValueError('Unkonw scale type: {}'.format(self.scale_type))
+            raise ValueError('Unknown scale type: {}'.format(self.scale_type))
         aug_scale = np.random.random() * (self.max_scale - self.min_scale) \
             + self.min_scale
         scale *= aug_scale
@@ -320,7 +328,7 @@ class BottomUpRandomAffine(object):
 
 
 @PIPELINES.register_module()
-class BottomUpGenerateTarget(object):
+class BottomUpGenerateTarget:
     """Generate multi-scale heatmap target for bottom-up.
 
     Args:
@@ -333,6 +341,7 @@ class BottomUpGenerateTarget(object):
         self.max_num_people = max_num_people
 
     def _generate(self, num_joints, heatmap_size):
+        """Get heatmap generator and joint encoder."""
         heatmap_generator = [
             HeatmapGenerator(output_size, num_joints, self.sigma)
             for output_size in heatmap_size
@@ -344,6 +353,7 @@ class BottomUpGenerateTarget(object):
         return heatmap_generator, joints_encoder
 
     def __call__(self, results):
+        """Generate multi-scale heatmap target for bottom-up."""
         heatmap_generator, joints_encoder = \
             self._generate(results['ann_info']['num_joints'],
                            results['ann_info']['heatmap_size'])
@@ -367,13 +377,13 @@ class BottomUpGenerateTarget(object):
 
 
 @PIPELINES.register_module()
-class BottomUpGetImgSize(object):
+class BottomUpGetImgSize:
     """Get multi-scale image sizes for bottom-up, including base_size and
     test_scale_factor. Keep the ratio and the image is resized to
     `results['ann_info']['image_size']×current_scale`.
 
     Args:
-        test_scale_fator (List[float]): Multi scale
+        test_scale_factor (List[float]): Multi scale
         current_scale (int): default 1
     """
 
@@ -383,6 +393,7 @@ class BottomUpGetImgSize(object):
         self.current_scale = current_scale
 
     def __call__(self, results):
+        """Get multi-scale image sizes for bottom-up."""
         input_size = results['ann_info']['image_size']
         img = results['img']
 
@@ -417,7 +428,7 @@ class BottomUpGetImgSize(object):
 
 
 @PIPELINES.register_module()
-class BottomUpResizeAlign(object):
+class BottomUpResizeAlign:
     """Resize multi-scale size and align transform for bottom-up.
 
     Args:
@@ -428,6 +439,7 @@ class BottomUpResizeAlign(object):
         self.transforms = Compose(transforms)
 
     def __call__(self, results):
+        """Resize multi-scale size and align transform for bottom-up."""
         input_size = results['ann_info']['image_size']
         test_scale_factor = results['ann_info']['test_scale_factor']
         aug_data = []

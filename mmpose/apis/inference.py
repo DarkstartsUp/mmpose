@@ -50,7 +50,7 @@ def _xyxy2xywh(bbox_xyxy):
 
     Returns:
         np.ndarray: Bounding boxes (with scores),
-            shaped (n, 4) or (n, 5). (left, top, width, height, [score])
+          shaped (n, 4) or (n, 5). (left, top, width, height, [score])
     """
     bbox_xywh = bbox_xyxy.copy()
     bbox_xywh[:, 2] = bbox_xywh[:, 2] - bbox_xywh[:, 0] + 1
@@ -66,7 +66,7 @@ def _xywh2xyxy(bbox_xywh):
             shaped (n, 4) or (n, 5). (left, top, width, height, [score])
     Returns:
         np.ndarray: Bounding boxes (with scores), shaped (n, 4) or
-            (n, 5). (left, top, right, bottom, [score])
+          (n, 5). (left, top, right, bottom, [score])
     """
     bbox_xyxy = bbox_xywh.copy()
     bbox_xyxy[:, 2] = bbox_xyxy[:, 2] + bbox_xyxy[:, 0] - 1
@@ -81,8 +81,10 @@ def _box2cs(cfg, box):
         x, y, w, h
 
     Returns:
-        np.ndarray[float32](2,): Center of the bbox (x, y).
-        np.ndarray[float32](2,): Scale of the bbox w & h.
+        tuple: A tuple containing center and scale.
+
+        - np.ndarray[float32](2,): Center of the bbox (x, y).
+        - np.ndarray[float32](2,): Scale of the bbox w & h.
     """
 
     x, y, w, h = box[:4]
@@ -103,7 +105,7 @@ def _box2cs(cfg, box):
     return center, scale
 
 
-class LoadImage(object):
+class LoadImage:
     """A simple pipeline to load image."""
 
     def __init__(self, color_type='color', channel_order='rgb'):
@@ -130,7 +132,7 @@ class LoadImage(object):
         return results
 
 
-def _inference_single_pose_model(model, img_or_path, bbox):
+def _inference_single_pose_model(model, img_or_path, bbox, dataset):
     """Inference a single bbox.
 
     num_keypoints: K
@@ -140,6 +142,7 @@ def _inference_single_pose_model(model, img_or_path, bbox):
         image_name (str | np.ndarray):Image_name
         bbox (list | np.ndarray): Bounding boxes (with scores),
             shaped (4, ) or (5, ). (left, top, width, height, [score])
+        dataset (str): Dataset name.
 
     Returns:
         ndarray[Kx3]: Predicted pose x, y, score.
@@ -153,25 +156,58 @@ def _inference_single_pose_model(model, img_or_path, bbox):
 
     assert len(bbox) in [4, 5]
     center, scale = _box2cs(cfg, bbox)
+
+    flip_pairs = None
+    if dataset == 'TopDownCocoDataset' or dataset == 'TopDownOCHumanDataset':
+        flip_pairs = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12],
+                      [13, 14], [15, 16]]
+    elif dataset == 'TopDownCocoWholeBodyDataset':
+        body = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12], [13, 14],
+                [15, 16]]
+        foot = [[17, 20], [18, 21], [19, 22]]
+
+        face = [[23, 39], [24, 38], [25, 37], [26, 36], [27, 35], [28, 34],
+                [29, 33], [30, 32], [40, 49], [41, 48], [42, 47], [43, 46],
+                [44, 45], [54, 58], [55, 57], [59, 68], [60, 67], [61, 66],
+                [62, 65], [63, 70], [64, 69], [71, 77], [72, 76], [73, 75],
+                [78, 82], [79, 81], [83, 87], [84, 86], [88, 90]]
+
+        hand = [[91, 112], [92, 113], [93, 114], [94, 115], [95, 116],
+                [96, 117], [97, 118], [98, 119], [99, 120], [100, 121],
+                [101, 122], [102, 123], [103, 124], [104, 125], [105, 126],
+                [106, 127], [107, 128], [108, 129], [109, 130], [110, 131],
+                [111, 132]]
+        flip_pairs = body + foot + face + hand
+    elif dataset == 'TopDownAicDataset':
+        flip_pairs = [[0, 3], [1, 4], [2, 5], [6, 9], [7, 10], [8, 11]]
+    elif dataset == 'TopDownOneHand10KDataset' or \
+            dataset == 'TopDownFreiHandDataset':
+        flip_pairs = []
+    else:
+        raise NotImplementedError()
+
     # prepare data
     data = {
-        'img_or_path': img_or_path,
-        'center': center,
-        'scale': scale,
-        'bbox_score': bbox[4] if len(bbox) == 5 else 1,
-        'dataset': 'coco',
-        'rotation': 0,
-        'imgnum': 0,
-        'joints_3d': np.zeros((cfg.data_cfg.num_joints, 3), dtype=np.float),
-        'joints_3d_visible': np.zeros((cfg.data_cfg.num_joints, 3),
-                                      dtype=np.float),
+        'img_or_path':
+        img_or_path,
+        'center':
+        center,
+        'scale':
+        scale,
+        'bbox_score':
+        bbox[4] if len(bbox) == 5 else 1,
+        'dataset':
+        dataset,
+        'joints_3d':
+        np.zeros((cfg.data_cfg.num_joints, 3), dtype=np.float32),
+        'joints_3d_visible':
+        np.zeros((cfg.data_cfg.num_joints, 3), dtype=np.float32),
+        'rotation':
+        0,
         'ann_info': {
-            'image_size':
-            cfg.data_cfg['image_size'],
-            'num_joints':
-            cfg.data_cfg['num_joints'],
-            'flip_pairs': [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12],
-                           [13, 14], [15, 16]],
+            'image_size': cfg.data_cfg['image_size'],
+            'num_joints': cfg.data_cfg['num_joints'],
+            'flip_pairs': flip_pairs
         }
     }
     data = test_pipeline(data)
@@ -179,6 +215,9 @@ def _inference_single_pose_model(model, img_or_path, bbox):
     if next(model.parameters()).is_cuda:
         # scatter to specified GPU
         data = scatter(data, [device])[0]
+    else:
+        # just get the actual data from DataContainer
+        data['img_metas'] = data['img_metas'].data[0]
 
     # forward the model
     with torch.no_grad():
@@ -188,11 +227,12 @@ def _inference_single_pose_model(model, img_or_path, bbox):
     return all_preds[0]
 
 
-def inference_pose_model(model,
-                         img_or_path,
-                         person_bboxes,
-                         bbox_thr=None,
-                         format='xywh'):
+def inference_top_down_pose_model(model,
+                                  img_or_path,
+                                  person_bboxes,
+                                  bbox_thr=None,
+                                  format='xywh',
+                                  dataset='TopDownCocoDataset'):
     """Inference a single image with a list of person bounding boxes.
 
     num_people: P
@@ -210,9 +250,12 @@ def inference_pose_model(model,
         format: bbox format ('xyxy' | 'xywh'). Default: 'xywh'.
             'xyxy' means (left, top, right, bottom),
             'xywh' means (left, top, width, height).
+        dataset (str): Dataset name, e.g. 'TopDownCocoDataset'.
 
     Returns:
-        list[dict]: Pose results: each item in the list is a dictionary,
+        list[dict]: The bbox & pose info.
+
+            Each item in the list is a dictionary,
             containing the bbox: (left, top, right, bottom, [score])
             and the pose (ndarray[Kx3]): x, y, score
     """
@@ -227,7 +270,8 @@ def inference_pose_model(model,
         if bbox_thr is not None:
             person_bboxes = person_bboxes[person_bboxes[:, 4] > bbox_thr]
         for bbox in person_bboxes:
-            pose = _inference_single_pose_model(model, img_or_path, bbox)
+            pose = _inference_single_pose_model(model, img_or_path, bbox,
+                                                dataset)
             pose_results.append({
                 'bbox':
                 _xywh2xyxy(np.expand_dims(np.array(bbox), 0)),
@@ -238,11 +282,75 @@ def inference_pose_model(model,
     return pose_results
 
 
+def inference_bottom_up_pose_model(model, img_or_path):
+    """Inference a single image.
+
+    num_people: P
+    num_keypoints: K
+    bbox height: H
+    bbox width: W
+
+    Args:
+        model (nn.Module): The loaded pose model.
+        image_name (str| np.ndarray): Image_name.
+
+    Returns:
+        list[ndarray]: The predicted pose info.
+
+            The length of the list
+            is the number of people (P). Each item in the
+            list is a ndarray, containing each person's
+            pose (ndarray[Kx3]): x, y, score
+    """
+    pose_results = []
+    cfg = model.cfg
+    device = next(model.parameters()).device
+
+    # build the data pipeline
+    test_pipeline = [LoadImage()] + cfg.test_pipeline[1:]
+    test_pipeline = Compose(test_pipeline)
+
+    # prepare data
+    data = {
+        'img_or_path': img_or_path,
+        'dataset': 'coco',
+        'ann_info': {
+            'image_size':
+            cfg.data_cfg['image_size'],
+            'num_joints':
+            cfg.data_cfg['num_joints'],
+            'flip_index':
+            [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15],
+        }
+    }
+
+    data = test_pipeline(data)
+    data = collate([data], samples_per_gpu=1)
+    if next(model.parameters()).is_cuda:
+        # scatter to specified GPU
+        data = scatter(data, [device])[0]
+    else:
+        # just get the actual data from DataContainer
+        data['img_metas'] = data['img_metas'].data[0]
+
+    # forward the model
+    with torch.no_grad():
+        all_preds, _, _ = model(
+            return_loss=False, img=data['img'], img_metas=data['img_metas'])
+
+    for pred in all_preds:
+        pose_results.append({
+            'keypoints': pred[:, :3],
+        })
+
+    return pose_results
+
+
 def vis_pose_result(model,
                     img,
                     result,
                     kpt_score_thr=0.3,
-                    skeleton=None,
+                    dataset='TopDownCocoDataset',
                     show=False,
                     out_file=None):
     """Visualize the detection results on the image.
@@ -265,14 +373,88 @@ def vis_pose_result(model,
                         [255, 102, 255], [255, 51, 255], [102, 178, 255],
                         [51, 153, 255], [255, 153, 153], [255, 102, 102],
                         [255, 51, 51], [153, 255, 153], [102, 255, 102],
-                        [51, 255, 51], [0, 255, 0]])
+                        [51, 255, 51], [0, 255, 0], [0, 0, 255], [255, 0, 0],
+                        [255, 255, 255]])
 
-    pose_limb_color = palette[[
-        0, 0, 0, 0, 7, 7, 7, 9, 9, 9, 9, 9, 16, 16, 16, 16, 16, 16, 16
-    ]]
-    pose_kpt_color = palette[[
-        16, 16, 16, 16, 16, 9, 9, 9, 9, 9, 9, 0, 0, 0, 0, 0, 0
-    ]]
+    if dataset == 'TopDownCocoDataset' or dataset == 'BottomUpCocoDataset' \
+            or dataset == 'TopDownOCHumanDataset':
+        # show the results
+        skeleton = [[16, 14], [14, 12], [17, 15], [15, 13], [12, 13], [6, 12],
+                    [7, 13], [6, 7], [6, 8], [7, 9], [8, 10], [9, 11], [2, 3],
+                    [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7]]
+
+        pose_limb_color = palette[[
+            0, 0, 0, 0, 7, 7, 7, 9, 9, 9, 9, 9, 16, 16, 16, 16, 16, 16, 16
+        ]]
+        pose_kpt_color = palette[[
+            16, 16, 16, 16, 16, 9, 9, 9, 9, 9, 9, 0, 0, 0, 0, 0, 0
+        ]]
+
+    elif dataset == 'TopDownCocoWholeBodyDataset':
+        # show the results
+        skeleton = [[16, 14], [14, 12], [17, 15], [15, 13], [12, 13], [6, 12],
+                    [7, 13], [6, 7], [6, 8], [7, 9], [8, 10], [9, 11], [2, 3],
+                    [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [16, 18],
+                    [16, 19], [16, 20], [17, 21], [17, 22], [17, 23], [24, 25],
+                    [25, 26], [26, 27], [27, 28], [28, 29], [29, 30], [30, 31],
+                    [31, 32], [32, 33], [33, 34], [34, 35], [35, 36], [36, 37],
+                    [37, 38], [38, 39], [39, 40], [92, 93], [93, 94], [94, 95],
+                    [95, 96], [92, 97], [97, 98], [98, 99], [99, 100],
+                    [92, 101], [101, 102], [102, 103], [103, 104], [92, 105],
+                    [105, 106], [106, 107], [107, 108], [92, 109], [109, 110],
+                    [110, 111], [111, 112], [113, 114], [114, 115], [115, 116],
+                    [116, 117], [113, 118], [118, 119], [119, 120], [120, 121],
+                    [113, 122], [122, 123], [123, 124], [124, 125], [113, 126],
+                    [126, 127], [127, 128], [128, 129], [113, 130], [130, 131],
+                    [131, 132], [132, 133]]
+
+        pose_limb_color = palette[
+            [0, 0, 0, 0, 7, 7, 7, 9, 9, 9, 9, 9, 16, 16, 16, 16, 16, 16, 16] +
+            [
+                16,
+            ] * 6 + [
+                19,
+            ] * 16 + [
+                19,
+            ] * 40]
+        pose_kpt_color = palette[
+            [16, 16, 16, 16, 16, 9, 9, 9, 9, 9, 9, 0, 0, 0, 0, 0, 0] + [
+                0,
+            ] * 6 + [
+                19,
+            ] * 68 + [
+                19,
+            ] * 42]
+
+    elif dataset == 'TopDownAicDataset':
+        skeleton = [[3, 2], [2, 1], [1, 14], [14, 4], [4, 5], [5, 6], [9, 8],
+                    [8, 7], [7, 10], [10, 11], [11, 12], [13, 14], [1, 7],
+                    [4, 10]]
+
+        pose_limb_color = palette[[
+            9, 9, 9, 9, 9, 9, 16, 16, 16, 16, 16, 0, 7, 7
+        ]]
+        pose_kpt_color = palette[[
+            9, 9, 9, 9, 9, 9, 16, 16, 16, 16, 16, 16, 0, 0
+        ]]
+
+    elif dataset == 'TopDownOneHand10KDataset' or \
+            dataset == 'TopDownFreiHandDataset':
+        skeleton = [[1, 2], [2, 3], [3, 4], [4, 5], [1, 6], [6, 7], [7, 8],
+                    [8, 9], [1, 10], [10, 11], [11, 12], [12, 13], [1, 14],
+                    [14, 15], [15, 16], [16, 17], [1, 18], [18, 19], [19, 20],
+                    [20, 21]]
+
+        pose_limb_color = palette[[
+            0, 0, 0, 0, 4, 4, 4, 4, 8, 8, 8, 8, 12, 12, 12, 12, 16, 16, 16, 16
+        ]]
+        pose_kpt_color = palette[[
+            0, 0, 0, 0, 0, 4, 4, 4, 4, 8, 8, 8, 8, 12, 12, 12, 12, 16, 16, 16,
+            16
+        ]]
+
+    else:
+        raise NotImplementedError()
 
     img = model.show_result(
         img,

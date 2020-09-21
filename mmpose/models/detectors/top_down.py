@@ -49,10 +49,11 @@ class TopDown(BasePose):
 
     @property
     def with_keypoint(self):
+        """Check if has keypoint_head."""
         return hasattr(self, 'keypoint_head')
 
     def init_weights(self, pretrained=None):
-
+        """Weight initialization for model."""
         self.backbone.init_weights(pretrained)
         if self.with_keypoint:
             self.keypoint_head.init_weights()
@@ -96,8 +97,8 @@ class TopDown(BasePose):
                 for training, `return loss=False` for validation & test.
 
         Returns:
-            if `return loss` is true, then return losses. Otherwise, return
-            predicted poses, boxes and image paths.
+            dict|tuple: if `return loss` is true, then return losses.
+              Otherwise, return predicted poses, boxes and image paths.
         """
         if return_loss:
             return self.forward_train(img, target, target_weight, img_metas,
@@ -106,6 +107,7 @@ class TopDown(BasePose):
             return self.forward_test(img, img_metas, **kwargs)
 
     def forward_train(self, img, target, target_weight, img_metas, **kwargs):
+        """Defines the computation performed at every call when training."""
         output = self.backbone(img)
         if self.with_keypoint:
             output = self.keypoint_head(output)
@@ -114,12 +116,12 @@ class TopDown(BasePose):
         losses = dict()
         if isinstance(output, list):
             # multi-stage models
-            for i in range(len(output)):
+            for output_i in output:
                 if 'mse_loss' not in losses:
-                    losses['mse_loss'] = self.loss(output[i], target,
+                    losses['mse_loss'] = self.loss(output_i, target,
                                                    target_weight)
                 else:
-                    losses['mse_loss'] += self.loss(output[i], target,
+                    losses['mse_loss'] += self.loss(output_i, target,
                                                     target_weight)
         else:
             losses['mse_loss'] = self.loss(output, target, target_weight)
@@ -179,7 +181,10 @@ class TopDown(BasePose):
 
         c = img_metas['center'].reshape(1, -1)
         s = img_metas['scale'].reshape(1, -1)
-        score = np.array(img_metas['bbox_score']).reshape(-1)
+
+        score = 1.0
+        if 'bbox_score' in img_metas:
+            score = np.array(img_metas['bbox_score']).reshape(-1)
 
         preds, maxvals = keypoints_from_heatmaps(
             output.clone().cpu().numpy(),
@@ -190,14 +195,14 @@ class TopDown(BasePose):
             kernel=self.test_cfg['modulate_kernel'])
 
         all_preds = np.zeros((1, output.shape[1], 3), dtype=np.float32)
-        all_boxes = np.zeros((1, 6))
+        all_boxes = np.zeros((1, 6), dtype=np.float32)
         image_path = []
 
         all_preds[0, :, 0:2] = preds[:, :, 0:2]
         all_preds[0, :, 2:3] = maxvals
         all_boxes[0, 0:2] = c[:, 0:2]
         all_boxes[0, 2:4] = s[:, 0:2]
-        all_boxes[0, 4] = np.prod(s * 200.0, 1)
+        all_boxes[0, 4] = np.prod(s * 200.0, axis=1)
         all_boxes[0, 5] = score
         image_path.extend(img_metas['image_file'])
 
@@ -229,7 +234,9 @@ class TopDown(BasePose):
                 to be shown. Default: 0.3.
             bbox_color (str or tuple or :obj:`Color`): Color of bbox lines.
             pose_kpt_color (np.array[Nx3]`): Color of N keypoints.
+                If None, do not draw keypoints.
             pose_limb_color (np.array[Mx3]): Color of M limbs.
+                If None, do not draw limbs.
             text_color (str or tuple or :obj:`Color`): Color of texts.
             thickness (int): Thickness of lines.
             font_scale (float): Font scales of texts.
@@ -240,7 +247,7 @@ class TopDown(BasePose):
                 Default: None.
 
         Returns:
-            img (Tensor): Only if not `show` or `out_file`
+            Tensor: Visualized img, only if not `show` or `out_file`.
         """
 
         img = mmcv.imread(img)
@@ -269,43 +276,39 @@ class TopDown(BasePose):
 
             for person_id, kpts in enumerate(pose_result):
                 # draw each point on image
-                for kid, kpt in enumerate(kpts):
-                    x_coord, y_coord, kpt_score = int(kpt[0]), int(
-                        kpt[1]), kpt[2]
-                    if kpt_score > kpt_score_thr:
-                        # cv2.circle(img, (x_coord, y_coord), radius,
-                        #            pose_kpt_color, thickness)
-                        img_copy = img.copy()
-                        r, g, b = pose_kpt_color[kid]
-                        cv2.circle(img_copy, (int(x_coord), int(y_coord)),
-                                   radius, (int(r), int(g), int(b)), -1)
-                        transparency = max(0, min(1, kpt_score))
-                        cv2.addWeighted(
-                            img_copy,
-                            transparency,
-                            img,
-                            1 - transparency,
-                            0,
-                            dst=img)
-
-                        # cv2.putText(img, f'{kid}', (x_coord, y_coord - 2),
-                        #             cv2.FONT_HERSHEY_COMPLEX, font_scale,
-                        #             text_color)
+                if pose_kpt_color is not None:
+                    assert len(pose_kpt_color) == len(kpts)
+                    for kid, kpt in enumerate(kpts):
+                        x_coord, y_coord, kpt_score = int(kpt[0]), int(
+                            kpt[1]), kpt[2]
+                        if kpt_score > kpt_score_thr:
+                            img_copy = img.copy()
+                            r, g, b = pose_kpt_color[kid]
+                            cv2.circle(img_copy, (int(x_coord), int(y_coord)),
+                                       radius, (int(r), int(g), int(b)), -1)
+                            transparency = max(0, min(1, kpt_score))
+                            cv2.addWeighted(
+                                img_copy,
+                                transparency,
+                                img,
+                                1 - transparency,
+                                0,
+                                dst=img)
 
                 # draw limbs
-                if skeleton is not None:
+                if skeleton is not None and pose_limb_color is not None:
+                    assert len(pose_limb_color) == len(skeleton)
                     for sk_id, sk in enumerate(skeleton):
                         pos1 = (int(kpts[sk[0] - 1, 0]), int(kpts[sk[0] - 1,
                                                                   1]))
                         pos2 = (int(kpts[sk[1] - 1, 0]), int(kpts[sk[1] - 1,
                                                                   1]))
-                        if pos1[0] > 0 and pos1[0] < img_w \
-                                and pos1[1] > 0 and pos1[1] < img_h \
-                                and pos2[0] > 0 and pos2[0] < img_w \
-                                and pos2[1] > 0 and pos2[1] < img_h \
-                                and kpts[sk[0] - 1, 2] > kpt_score_thr \
-                                and kpts[sk[1] - 1, 2] > kpt_score_thr:
-                            # cv2.line(img, pos1, pos2, pose_kpt_color, 2, 8)
+                        if (pos1[0] > 0 and pos1[0] < img_w and pos1[1] > 0
+                                and pos1[1] < img_h and pos2[0] > 0
+                                and pos2[0] < img_w and pos2[1] > 0
+                                and pos2[1] < img_h
+                                and kpts[sk[0] - 1, 2] > kpt_score_thr
+                                and kpts[sk[1] - 1, 2] > kpt_score_thr):
                             img_copy = img.copy()
                             X = (pos1[0], pos2[0])
                             Y = (pos1[1], pos2[1])

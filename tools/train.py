@@ -8,6 +8,7 @@ import mmcv
 import torch
 from mmcv import Config, DictAction
 from mmcv.runner import init_dist, set_random_seed
+from mmcv.utils import get_git_hash
 
 from mmpose import __version__
 from mmpose.apis import train_model
@@ -138,7 +139,7 @@ def main():
         # save mmpose version, config file content
         # checkpoints as meta data
         cfg.checkpoint_config.meta = dict(
-            mmpose_version=__version__,
+            mmpose_version=__version__ + get_git_hash(digits=7),
             config=cfg.pretty_text,
         )
     train_model(

@@ -3,9 +3,9 @@ from collections import OrderedDict, defaultdict
 
 import json_tricks as json
 import numpy as np
-import pycocotools
-from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
+import xtcocotools
+from xtcocotools.coco import COCO
+from xtcocotools.cocoeval import COCOeval
 
 from mmpose.datasets.builder import DATASETS
 from .bottom_up_base_dataset import BottomUpBaseDataset
@@ -66,8 +66,8 @@ class BottomUpCocoDataset(BottomUpBaseDataset):
             0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15
         ]
 
-        self.ann_info['use_different_joints_weight'] = False
-        self.ann_info['joints_weight'] = np.array(
+        self.ann_info['use_different_joint_weights'] = False
+        self.ann_info['joint_weights'] = np.array(
             [
                 1., 1., 1., 1., 1., 1., 1., 1.2, 1.2, 1.5, 1.5, 1., 1., 1.2,
                 1.2, 1.5, 1.5
@@ -90,13 +90,14 @@ class BottomUpCocoDataset(BottomUpBaseDataset):
         self.num_classes = len(self.classes)
         self._class_to_ind = dict(zip(self.classes, range(self.num_classes)))
         self._class_to_coco_ind = dict(zip(cats, self.coco.getCatIds()))
-        self._coco_ind_to_class_ind = dict([(self._class_to_coco_ind[cls],
-                                             self._class_to_ind[cls])
-                                            for cls in self.classes[1:]])
+        self._coco_ind_to_class_ind = dict(
+            (self._class_to_coco_ind[cls], self._class_to_ind[cls])
+            for cls in self.classes[1:])
 
         self.num_images = len(self.ids)
 
     def __len__(self):
+        """Get dataset length."""
         return len(self.ids)
 
     def _get_single(self, idx):
@@ -106,7 +107,7 @@ class BottomUpCocoDataset(BottomUpBaseDataset):
             idx (int): image idx
 
         Returns:
-            db_rec (dict): info for model training
+            dict: info for model training
         """
         coco = self.coco
         img_id = self.ids[idx]
@@ -140,9 +141,11 @@ class BottomUpCocoDataset(BottomUpBaseDataset):
         num_people = len(anno)
 
         if self.ann_info['scale_aware_sigma']:
-            joints = np.zeros((num_people, self.ann_info['num_joints'], 4))
+            joints = np.zeros((num_people, self.ann_info['num_joints'], 4),
+                              dtype=np.float32)
         else:
-            joints = np.zeros((num_people, self.ann_info['num_joints'], 3))
+            joints = np.zeros((num_people, self.ann_info['num_joints'], 3),
+                              dtype=np.float32)
 
         for i, obj in enumerate(anno):
             joints[i, :self.ann_info['num_joints'], :3] = \
@@ -168,16 +171,16 @@ class BottomUpCocoDataset(BottomUpBaseDataset):
 
         for obj in anno:
             if obj['iscrowd']:
-                rle = pycocotools.mask.frPyObjects(obj['segmentation'],
+                rle = xtcocotools.mask.frPyObjects(obj['segmentation'],
                                                    img_info['height'],
                                                    img_info['width'])
-                m += pycocotools.mask.decode(rle)
+                m += xtcocotools.mask.decode(rle)
             elif obj['num_keypoints'] == 0:
-                rles = pycocotools.mask.frPyObjects(obj['segmentation'],
+                rles = xtcocotools.mask.frPyObjects(obj['segmentation'],
                                                     img_info['height'],
                                                     img_info['width'])
                 for rle in rles:
-                    m += pycocotools.mask.decode(rle)
+                    m += xtcocotools.mask.decode(rle)
 
         return m < 0.5
 
@@ -199,12 +202,16 @@ class BottomUpCocoDataset(BottomUpBaseDataset):
                     '2', '0', '1', '7', '/', '0', '0', '0', '0', '0',
                     '0', '3', '9', '7', '1', '3', '3', '.', 'j', 'p', 'g']
             res_folder (str): Path of directory to save the results.
-            metric (str): Metric to be performed. Defaults: 'mAP'.
+            metric (str | list[str]): Metric to be performed. Defaults: 'mAP'.
 
         Returns:
-            name_value (dict): Evaluation results for evaluation metric.
+            dict: Evaluation results for evaluation metric.
         """
-        assert metric == 'mAP'
+        metrics = metric if isinstance(metric, list) else [metric]
+        allowed_metrics = ['mAP']
+        for metric in metrics:
+            if metric not in allowed_metrics:
+                raise KeyError(f'metric {metric} is not supported')
 
         res_file = os.path.join(res_folder, 'result_keypoints.json')
 
@@ -272,6 +279,7 @@ class BottomUpCocoDataset(BottomUpBaseDataset):
             json.dump(results, f, sort_keys=True, indent=4)
 
     def _coco_keypoint_results_one_category_kernel(self, data_pack):
+        """Get coco keypoint results."""
         cat_id = data_pack['cat_id']
         keypoints = data_pack['keypoints']
         cat_results = []
@@ -310,20 +318,18 @@ class BottomUpCocoDataset(BottomUpBaseDataset):
 
     def _do_python_keypoint_eval(self, res_file):
         """Keypoint evaluation using COCOAPI."""
-        coco_dt = self.coco.loadRes(res_file)
-        coco_eval = COCOeval(self.coco, coco_dt, 'keypoints')
+        coco_det = self.coco.loadRes(res_file)
+        coco_eval = COCOeval(self.coco, coco_det, 'keypoints')
         coco_eval.params.useSegm = None
         coco_eval.evaluate()
         coco_eval.accumulate()
         coco_eval.summarize()
 
         stats_names = [
-            'AP', 'Ap .5', 'AP .75', 'AP (M)', 'AP (L)', 'AR', 'AR .5',
+            'AP', 'AP .5', 'AP .75', 'AP (M)', 'AP (L)', 'AR', 'AR .5',
             'AR .75', 'AR (M)', 'AR (L)'
         ]
 
-        info_str = []
-        for ind, name in enumerate(stats_names):
-            info_str.append((name, coco_eval.stats[ind]))
+        info_str = list(zip(stats_names, coco_eval.stats))
 
         return info_str

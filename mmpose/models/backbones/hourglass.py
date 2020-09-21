@@ -1,12 +1,12 @@
 import torch.nn as nn
 from mmcv.cnn import ConvModule, constant_init, normal_init
-from mmcv.runner import load_checkpoint
 from torch.nn.modules.batchnorm import _BatchNorm
 
 from mmpose.utils import get_root_logger
 from ..registry import BACKBONES
 from .base_backbone import BaseBackbone
 from .resnet import BasicBlock, ResLayer
+from .utils import load_checkpoint
 
 
 class HourglassModule(nn.Module):
@@ -71,6 +71,7 @@ class HourglassModule(nn.Module):
         self.up2 = nn.Upsample(scale_factor=2)
 
     def forward(self, x):
+        """Model forward function."""
         up1 = self.up1(x)
         low1 = self.low1(x)
         low2 = self.low2(low1)
@@ -118,7 +119,7 @@ class HourglassNet(BaseBackbone):
                  stage_blocks=(2, 2, 2, 2, 2, 4),
                  feat_channel=256,
                  norm_cfg=dict(type='BN', requires_grad=True)):
-        super(HourglassNet, self).__init__()
+        super().__init__()
 
         self.num_stacks = num_stacks
         assert self.num_stacks >= 1
@@ -184,6 +185,7 @@ class HourglassNet(BaseBackbone):
         pass
 
     def forward(self, x):
+        """Model forward function."""
         inter_feat = self.stem(x)
         out_feats = []
 

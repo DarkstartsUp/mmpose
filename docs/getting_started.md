@@ -5,43 +5,23 @@ For installation instructions, please see [install.md](install.md).
 
 ## Prepare datasets
 
-It is recommended to symlink the dataset root to `$MMPOSE/data`.
-If your folder structure is different, you may need to change the corresponding paths in config files.
+MMPose supported datasets:
 
-**For COCO data**, please download from [COCO download](http://cocodataset.org/#download), 2017 Train/Val is needed for COCO keypoints training and validation. [HRNet-Human-Pose-Estimation](https://github.com/HRNet/HRNet-Human-Pose-Estimation) provides person detection result of COCO val2017  to reproduce our multi-person pose estimation results. Please download from [OneDrive](https://1drv.ms/f/s!AhIXJn_J-blWzzDXoz5BeFl8sWM-)
-Download and extract them under $MMPOSE/data, and make them look like this:
+- [COCO](http://cocodataset.org/)
+- [COCO-WholeBody](https://github.com/jin-s13/COCO-WholeBody/)
+- [MPII](http://human-pose.mpi-inf.mpg.de/)
+- [MPII-TRB](https://github.com/kennymckormick/Triplet-Representation-of-human-Body)
+- [AI Challenger](https://github.com/AIChallenger/AI_Challenger_2017)
+- [OCHuman](https://github.com/liruilong940607/OCHumanApi)
+- [CrowdPose](https://github.com/Jeff-sjtu/CrowdPose)
+- [OneHand10K](https://www.yangangwang.com/papers/WANG-MCC-2018-10.html)
+- [FreiHand](https://lmb.informatik.uni-freiburg.de/projects/freihand/)
 
-```
-mmpose
-├── mmpose
-├── docs
-├── tests
-├── tools
-├── configs
-`── data
-    │── coco
-        │-- annotations
-        │   │-- person_keypoints_train2017.json
-        │   |-- person_keypoints_val2017.json
-        |-- person_detection_results
-        |   |-- COCO_val2017_detections_AP_H_56_person.json
-        │-- train2017
-        │   │-- 000000000009.jpg
-        │   │-- 000000000025.jpg
-        │   │-- 000000000030.jpg
-        │   │-- ...
-        `-- val2017
-            │-- 000000000139.jpg
-            │-- 000000000285.jpg
-            │-- 000000000632.jpg
-            │-- ...
+Please follow [DATA Preparation](data_preparation.md) to prepare the data.
 
-```
 
-For using custom datasets, please refer to [Tutorial 2: Adding New Dataset](tutorials/new_dataset.md)
-
-## Prepare Pratrained Models
-Download imagenet pretrained models from our [model zoo](model_zoo.md)
+## Prepare Pretrained Models
+Download imagenet pretrained models from our [model zoo](https://mmpose.readthedocs.io/en/latest/pretrained.html)
 
 ```
 mmpose
@@ -122,30 +102,29 @@ Assume that you have already downloaded the checkpoints to the directory `checkp
 
 
 
-### Image demo
+### Top-down image demo
 
 #### Using gt human bounding boxes as input
 
 We provide a demo script to test a single image, given gt json file.
 
 ```shell
-python demo/image_demo.py \
+python demo/top_down_img_demo.py \
     ${MMPOSE_CONFIG_FILE} ${MMPOSE_CHECKPOINT_FILE} \
     --img-root ${IMG_ROOT} --json-file ${JSON_FILE} \
-    --show \
-    [--out-img-root ${OUTPUT_DIR} --device ${GPU_ID}] \
+    --out-img-root ${OUTPUT_DIR} \
+    [--show --device ${GPU_ID}] \
     [--kpt-thr ${KPT_SCORE_THR}]
 ```
 
 Examples:
 
 ```shell
-python demo/image_demo.py \
+python demo/top_down_img_demo.py \
     configs/top_down/hrnet/coco/hrnet_w48_coco_256x192.py \
     hrnet_w48_coco_256x192/epoch_210.pth \
-    --img-root tests/data/ --json-file tests/data/test_coco.json \
-    --show \
-    --out-img-root ./
+    --img-root tests/data/coco/ --json-file tests/data/coco/test_coco.json \
+    --out-img-root vis_results
 ```
 
 #### Using mmdet for human bounding box detection
@@ -155,54 +134,100 @@ Assume that you have already installed [mmdet](https://github.com/open-mmlab/mmd
 We provide a demo script to run mmdet for human detection, and mmpose for pose estimation.
 
 ```shell
-python demo/image_demo_with_mmdet.py \
+python demo/top_down_img_demo_with_mmdet.py \
     ${MMDET_CONFIG_FILE} ${MMDET_CHECKPOINT_FILE} \
     ${MMPOSE_CONFIG_FILE} ${MMPOSE_CHECKPOINT_FILE} \
     --img-root ${IMG_ROOT} --img ${IMG_FILE} \
-    --show \
-    [--out-img-root ${OUTPUT_DIR} --device ${GPU_ID}] \
+    --out-img-root ${OUTPUT_DIR} \
+    [--show --device ${GPU_ID}] \
     [--bbox-thr ${BBOX_SCORE_THR} --kpt-thr ${KPT_SCORE_THR}]
 ```
 
 Examples:
 
 ```shell
-python demo/img_demo_with_mmdet.py mmdetection/configs/faster_rcnn/faster_rcnn_r50_fpn_1x_coco.py \
+python demo/top_down_img_demo_with_mmdet.py mmdetection/configs/faster_rcnn/faster_rcnn_r50_fpn_1x_coco.py \
     mmdetection/checkpoints/faster_rcnn_r50_fpn_1x_coco_20200130-047c8118.pth \
     configs/top_down/hrnet/coco/hrnet_w48_coco_256x192.py \
-    hrnet_w48_coco_256x192/epoch_210.pth \
-    --img-root tests/data/ \
+    hrnet_w48_coco_256x192-b9e0b3ab_20200708.pth \
+    --img-root tests/data/coco/ \
     --img 000000196141.jpg \
-    --show \
-    --out-img-root ./
+    --out-img-root vis_results
 ```
 
-### Video demo
+### Top-down video demo
 
 We also provide a video demo to illustrate the results.
 
 Assume that you have already installed [mmdet](https://github.com/open-mmlab/mmdetection).
 
 ```shell
-python demo/video_demo_with_mmdet.py \
+python demo/top_down_video_demo_with_mmdet.py \
     ${MMDET_CONFIG_FILE} ${MMDET_CHECKPOINT_FILE} \
     ${MMPOSE_CONFIG_FILE} ${MMPOSE_CHECKPOINT_FILE} \
     --video-path ${VIDEO_FILE} \
-    --show \
-    [--output-video-root ${OUTPUT_VIDEO_ROOT} --device ${GPU_ID}] \
+    --output-video-root ${OUTPUT_VIDEO_ROOT} \
+    [--show --device ${GPU_ID}] \
     [--bbox-thr ${BBOX_SCORE_THR} --kpt-thr ${KPT_SCORE_THR}]
 ```
 
 Examples:
 
 ```shell
-python demo/video_demo_with_mmdet.py mmdetection/configs/faster_rcnn/faster_rcnn_r50_fpn_1x_coco.py \
+python demo/top_down_video_demo_with_mmdet.py mmdetection/configs/faster_rcnn/faster_rcnn_r50_fpn_1x_coco.py \
     mmdetection/checkpoints/faster_rcnn_r50_fpn_1x_coco_20200130-047c8118.pth \
     configs/top_down/hrnet/coco/hrnet_w48_coco_256x192.py \
-    hrnet_w48_coco_256x192/epoch_210.pth \
-    --video_path demo/demo_video.mp4 \
-    --show \
-    --output-video-root ./
+    hrnet_w48_coco_256x192-b9e0b3ab_20200708.pth \
+    --video-path demo/demo_video.mp4 \
+    --out-video-root vis_results
+```
+
+
+### Bottom-up image demo
+
+We provide a demo script to test a single image.
+
+```shell
+python demo/bottom_up_img_demo.py \
+    ${MMPOSE_CONFIG_FILE} ${MMPOSE_CHECKPOINT_FILE} \
+    --img-root ${IMG_ROOT} --json-file ${JSON_FILE} \
+    --out-img-root ${OUTPUT_DIR} \
+    [--show --device ${GPU_ID}] \
+    [--kpt-thr ${KPT_SCORE_THR}]
+```
+
+Examples:
+
+```shell
+python demo/bottom_up_img_demo.py \
+    configs/bottom_up/hrnet/coco/hrnet_w32_coco_512x512.py \
+    hrnet_w32_coco_512x512-bcb8c247_20200816.pth \
+    --img-root tests/data/coco/ --json-file tests/data/coco/test_coco.json \
+    --out-img-root vis_results
+```
+
+
+### Bottom-up video demo
+
+We also provide a video demo to illustrate the results.
+
+```shell
+python demo/bottom_up_video_demo.py \
+    ${MMPOSE_CONFIG_FILE} ${MMPOSE_CHECKPOINT_FILE} \
+    --video-path ${VIDEO_FILE} \
+    --output-video-root ${OUTPUT_VIDEO_ROOT} \
+    [--show --device ${GPU_ID}] \
+    [--bbox-thr ${BBOX_SCORE_THR} --kpt-thr ${KPT_SCORE_THR}]
+```
+
+Examples:
+
+```shell
+python demo/bottom_up_video_demo.py \
+    configs/bottom_up/hrnet/coco/hrnet_w32_coco_512x512.py \
+    hrnet_w32_coco_512x512-bcb8c247_20200816.pth \
+    --video-path demo/demo_video.mp4 \
+    --out-video-root vis_results
 ```
 
 ## Train a model
@@ -261,20 +286,22 @@ Here is an example of using 8 GPUs to load ResNet50 checkpoint.
 If you can run MMPose on a cluster managed with [slurm](https://slurm.schedmd.com/), you can use the script `slurm_train.sh`. (This script also supports single machine training.)
 
 ```shell
-./tools/slurm_train.sh ${PARTITION} ${JOB_NAME} ${CONFIG_FILE} ${WORK_DIR} [${GPUS}]
+./tools/slurm_train.sh ${PARTITION} ${JOB_NAME} ${CONFIG_FILE} ${WORK_DIR}
 ```
 
-Here is an example of using 16 GPUs to train ResNet50 on the dev partition in a slurm cluster. (use `GPUS_PER_NODE=8` to specify a single slurm cluster node with 8 GPUs.)
+Here is an example of using 16 GPUs to train ResNet50 on the dev partition in a slurm cluster.
+(Use `GPUS_PER_NODE=8` to specify a single slurm cluster node with 8 GPUs, `CPUS_PER_TASK=2` to use 2 cpus per task.
+Assume that `Test` is a valid ${PARTITION} name.)
 
 ```shell
-GPUS_PER_NODE=8 ./tools/slurm_train.sh configs/top_down/resnet/coco/res50_coco_256x192.py work_dirs/res50_coco_256x192 16
+GPUS=16 GPUS_PER_NODE=8 CPUS_PER_TASK=2 ./tools/slurm_train.sh Test res50 configs/top_down/resnet/coco/res50_coco_256x192.py work_dirs/res50_coco_256x192
 ```
 
-You can check [slurm_train.sh](../tools/slurm_train.sh) for full arguments and environment variables.
+You can check [slurm_train.sh](https://github.com/open-mmlab/mmpose/tree/master/tools/slurm_train.sh) for full arguments and environment variables.
 
 If you have just multiple machines connected with ethernet, you can refer to
 pytorch [launch utility](https://pytorch.org/docs/stable/distributed_deprecated.html#launch-utility).
-Usually it is slow if you do not have high speed networking like infiniband.
+Usually it is slow if you do not have high speed networking like InfiniBand.
 
 ### Launch multiple jobs on a single machine
 
@@ -305,6 +332,12 @@ Then you can launch two jobs with `config1.py` ang `config2.py`.
 ```shell
 CUDA_VISIBLE_DEVICES=0,1,2,3 ./tools/slurm_train.sh ${PARTITION} ${JOB_NAME} config1.py ${WORK_DIR} 4
 CUDA_VISIBLE_DEVICES=4,5,6,7 ./tools/slurm_train.sh ${PARTITION} ${JOB_NAME} config2.py ${WORK_DIR} 4
+```
+
+## Benchmark
+You can get average inference speed using the following script. Note that it does not include the IO time and the pre-processing time.
+```shell
+python tools/benchmark_inference.py ${MMPOSE_CONFIG_FILE}
 ```
 
 ## Tutorials

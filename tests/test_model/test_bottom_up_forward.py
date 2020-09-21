@@ -13,8 +13,10 @@ def test_bottomup_forward():
             type='BottomUpSimpleHead',
             in_channels=512,
             num_joints=17,
+            num_deconv_layers=0,
+            tag_per_joint=True,
             with_ae_loss=[True],
-            extra={'final_conv_kernel': 3}),
+            extra=dict(final_conv_kernel=1, )),
         train_cfg=dict(),
         test_cfg=dict(
             num_joints=17,
@@ -75,9 +77,7 @@ def test_bottomup_forward():
 
     # Test forward test
     with torch.no_grad():
-        detector = detector.cuda()
-        _ = detector.forward(
-            imgs.cuda(), img_metas=img_metas, return_loss=False)
+        _ = detector.forward(imgs, img_metas=img_metas, return_loss=False)
 
 
 def _demo_mm_inputs(input_shape=(1, 3, 256, 256)):
@@ -92,9 +92,9 @@ def _demo_mm_inputs(input_shape=(1, 3, 256, 256)):
     rng = np.random.RandomState(0)
 
     imgs = rng.rand(*input_shape)
-    target = np.zeros([N, 17, H // 32, W // 32])
-    mask = np.ones([N, H // 32, W // 32])
-    joints = np.zeros([N, 30, 17, 2])
+    target = np.zeros([N, 17, H // 32, W // 32], dtype=np.float32)
+    mask = np.ones([N, H // 32, W // 32], dtype=np.float32)
+    joints = np.zeros([N, 30, 17, 2], dtype=np.float32)
 
     img_metas = [{
         'image_file':

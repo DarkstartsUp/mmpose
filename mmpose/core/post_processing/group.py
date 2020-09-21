@@ -15,7 +15,7 @@ def _py_max_match(scores):
         scores(np.ndarray): cost matrix.
 
     Returns:
-        tmp(np.ndarray): best match.
+        np.ndarray: best match.
     """
     m = Munkres()
     tmp = m.compute(scores)
@@ -43,7 +43,7 @@ def _match_by_tag(inp, params):
         params(Params): class Params().
 
     Returns:
-        ans(np.ndarray): result of pose groups.
+        np.ndarray: result of pose groups.
     """
     assert isinstance(params, _Params), 'params should be class _Params()'
 
@@ -113,7 +113,7 @@ def _match_by_tag(inp, params):
     return ans
 
 
-class _Params(object):
+class _Params:
     """A class of parameter.
 
     Args:
@@ -138,7 +138,7 @@ class _Params(object):
             self.joint_order = list(np.arange(self.num_joints))
 
 
-class HeatmapParser(object):
+class HeatmapParser:
     """The heatmap parser for post processing."""
 
     def __init__(self, cfg):
@@ -154,7 +154,7 @@ class HeatmapParser(object):
             heatmap(torch.Tensor): Heatmaps before nms.
 
         Returns:
-            heatmap(torch.Tensor): Heatmaps after nms.
+            torch.Tensor: Heatmaps after nms.
         """
 
         maxm = self.pool(heatmaps)
@@ -199,14 +199,15 @@ class HeatmapParser(object):
             tags (torch.Tensor[NxKxHxWxL])
 
         Return:
-            ans(dict):
-                tag_k (np.ndarray[NxKxMxL]):
-                    tag corresponding to the top k values of
-                    feature map per keypoint.
-                loc_k (np.ndarray[NxKxMx2]):
-                    top k location of fearure map per keypoint.
-                val_k (np.ndarray[NxKxM]):
-                    top k value of feature map per keypoint.
+            dict: A dict containing top_k values.
+
+            - tag_k (np.ndarray[NxKxMxL]):
+              tag corresponding to the top k values of
+              feature map per keypoint.
+            - loc_k (np.ndarray[NxKxMx2]):
+              top k location of feature map per keypoint.
+            - val_k (np.ndarray[NxKxM]):
+              top k value of feature map per keypoint.
         """
         heatmaps = self.nms(heatmaps)
         N, K, H, W = heatmaps.size()
@@ -222,7 +223,7 @@ class HeatmapParser(object):
             dim=3)
 
         x = ind % W
-        y = (ind / W).long()
+        y = ind // W
 
         ind_k = torch.stack((x, y), dim=3)
 
@@ -240,34 +241,34 @@ class HeatmapParser(object):
         Note:
             batch size: N
             number of keypoints: K
-            heatmap hight: H
+            heatmap height: H
             heatmap width: W
 
         Args:
-            ans (List(np.ndarray))
-            heatmaps (torch.Tensor[NxKxHxW])
+            ans (list(np.ndarray)): Keypoint predictions.
+            heatmaps (torch.Tensor[NxKxHxW]): Heatmaps.
         """
         N, K, H, W = heatmaps.shape
         for batch_id, people in enumerate(ans):
-            for people_id, i in enumerate(people):
-                for joint_id, joint in enumerate(i):
+            for people_id, people_i in enumerate(people):
+                for joint_id, joint in enumerate(people_i):
                     if joint[2] > 0:
-                        y, x = joint[0:2]
+                        x, y = joint[0:2]
                         xx, yy = int(x), int(y)
                         tmp = heatmaps[batch_id][joint_id]
-                        if tmp[xx, min(yy + 1, H - 1)] > tmp[xx,
-                                                             max(yy - 1, 0)]:
+                        if tmp[min(H - 1, yy + 1), xx] > tmp[max(0, yy - 1),
+                                                             xx]:
                             y += 0.25
                         else:
                             y -= 0.25
 
-                        if tmp[min(xx + 1, W - 1), yy] > tmp[max(0, xx - 1),
-                                                             yy]:
+                        if tmp[yy, min(W - 1, xx + 1)] > tmp[yy,
+                                                             max(0, xx - 1)]:
                             x += 0.25
                         else:
                             x -= 0.25
                         ans[batch_id][people_id, joint_id,
-                                      0:2] = (y + 0.5, x + 0.5)
+                                      0:2] = (x + 0.5, y + 0.5)
         return ans
 
     def refine(self, heatmap, tag, keypoints):
@@ -275,7 +276,7 @@ class HeatmapParser(object):
 
         Note:
             number of keypoints: K
-            heatmap hight: H
+            heatmap height: H
             heatmap width: W
 
         Args:
@@ -285,8 +286,7 @@ class HeatmapParser(object):
                         last dim is (x, y, heatmap score, tag score).
 
         Returns:
-            keypoints: np.ndarray of size (K, 4) if not flip,
-                        last dim is (x, y, heatmap score, tag score).
+            np.ndarray: The refined keypoints.
         """
 
         K, H, W = heatmap.shape
@@ -313,8 +313,8 @@ class HeatmapParser(object):
 
             # find maximum position
             y, x = np.unravel_index(np.argmax(norm_heatmap), _heatmap.shape)
-            xx = x
-            yy = y
+            xx = x.copy()
+            yy = y.copy()
             # detection score at maximum position
             val = _heatmap[y, x]
             # offset by 0.5
@@ -322,12 +322,12 @@ class HeatmapParser(object):
             y += 0.5
 
             # add a quarter offset
-            if _heatmap[yy, min(xx + 1, W - 1)] > _heatmap[yy, max(xx - 1, 0)]:
+            if _heatmap[yy, min(W - 1, xx + 1)] > _heatmap[yy, max(0, xx - 1)]:
                 x += 0.25
             else:
                 x -= 0.25
 
-            if _heatmap[min(yy + 1, H - 1), xx] > _heatmap[max(0, yy - 1), xx]:
+            if _heatmap[min(H - 1, yy + 1), xx] > _heatmap[max(0, yy - 1), xx]:
                 y += 0.25
             else:
                 y -= 0.25
@@ -349,15 +349,19 @@ class HeatmapParser(object):
         Note:
             batch size: N
             number of keypoints: K
-            heatmap hight: H
+            heatmap height: H
             heatmap width: W
             L: 2 if use flip test else 1
+
         Args:
             heatmaps (torch.Tensor[NxKxHxW]): model output heatmaps.
             tags (torch.Tensor[NxKxHxWxL]): model output tagmaps.
+
         Returns:
-            ans (List(np.ndarray)): pose results.
-            scores (List): score of people.
+            tuple: A tuple containing keypoint grouping results.
+
+            - ans (list(np.ndarray)): Pose results.
+            - scores (list): Score of people.
         """
         ans = self.match(**self.top_k(heatmaps, tags))
 

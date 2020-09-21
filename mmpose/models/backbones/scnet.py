@@ -70,6 +70,7 @@ class SCConv(nn.Module):
         )
 
     def forward(self, x):
+        """Forward function."""
         identity = x
 
         out = torch.sigmoid(
@@ -92,7 +93,7 @@ class SCBottleneck(Bottleneck):
     pooling_r = 4
 
     def __init__(self, in_channels, out_channels, **kwargs):
-        super(SCBottleneck, self).__init__(in_channels, out_channels, **kwargs)
+        super().__init__(in_channels, out_channels, **kwargs)
         self.mid_channels = out_channels // self.expansion // 2
 
         self.norm1_name, norm1 = build_norm_layer(
@@ -145,6 +146,7 @@ class SCBottleneck(Bottleneck):
         self.add_module(self.norm3_name, norm3)
 
     def forward(self, x):
+        """Forward function."""
 
         def _inner_forward(x):
             identity = x
@@ -238,4 +240,4 @@ class SCNet(ResNet):
     def __init__(self, depth, **kwargs):
         if depth not in self.arch_settings:
             raise KeyError(f'invalid depth {depth} for SCNet')
-        super(SCNet, self).__init__(depth, **kwargs)
+        super().__init__(depth, **kwargs)

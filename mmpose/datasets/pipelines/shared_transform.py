@@ -44,12 +44,12 @@ class NormalizeTensor():
 
 
 @PIPELINES.register_module()
-class Compose(object):
+class Compose:
     """Compose a data pipeline with a sequence of transforms.
 
     Args:
-        transforms (list[dict | callable]):
-            Either config dicts of transforms or transform objects.
+        transforms (list[dict | callable]): Either config
+          dicts of transforms or transform objects.
     """
 
     def __init__(self, transforms):
@@ -66,6 +66,14 @@ class Compose(object):
                                 f' {type(transform)}')
 
     def __call__(self, data):
+        """Call function to apply transforms sequentially.
+
+        Args:
+            data (dict): A result dict contains the data to transform.
+
+        Returns:
+            dict: Transformed data.
+        """
         for t in self.transforms:
             data = t(data)
             if data is None:
@@ -73,6 +81,7 @@ class Compose(object):
         return data
 
     def __repr__(self):
+        """Compute the string representation."""
         format_string = self.__class__.__name__ + '('
         for t in self.transforms:
             format_string += f'\n    {t}'
@@ -81,7 +90,7 @@ class Compose(object):
 
 
 @PIPELINES.register_module()
-class Collect(object):
+class Collect:
     """Collect data from the loader relevant to the specific task.
 
     This keeps the items in `keys` as it is, and collect items in `meta_keys`
@@ -95,9 +104,9 @@ class Collect(object):
     Args:
         keys (Sequence[str]): Required keys to be collected.
         meta_name (str): The name of the key that contains meta infomation.
-            This key is always populated. Default: "img_metas".
+          This key is always populated. Default: "img_metas".
         meta_keys (Sequence[str]): Keys that are collected under meta_name.
-            The contents of the `meta_name` dictionary depends on `meta_keys`.
+          The contents of the `meta_name` dictionary depends on `meta_keys`.
     """
 
     def __init__(self, keys, meta_keys, meta_name='img_metas'):
@@ -106,6 +115,12 @@ class Collect(object):
         self.meta_name = meta_name
 
     def __call__(self, results):
+        """Performs the Collect formating.
+
+        Args:
+            results (dict): The resulting dict to be modified and passed
+              to the next transform in pipeline.
+        """
         if 'ann_info' in results:
             results.update(results['ann_info'])
 
@@ -122,5 +137,6 @@ class Collect(object):
         return data
 
     def __repr__(self):
+        """Compute the string representation."""
         return (f'{self.__class__.__name__}('
                 f'keys={self.keys}, meta_keys={self.meta_keys})')

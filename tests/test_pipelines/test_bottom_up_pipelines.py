@@ -2,9 +2,9 @@ import copy
 import os.path as osp
 
 import numpy as np
-import pycocotools
 import pytest
-from pycocotools.coco import COCO
+import xtcocotools
+from xtcocotools.coco import COCO
 
 from mmpose.datasets.pipelines import (BottomUpGenerateTarget,
                                        BottomUpGetImgSize,
@@ -16,20 +16,20 @@ from mmpose.datasets.pipelines import (BottomUpGenerateTarget,
 def _get_mask(coco, anno, img_id):
     img_info = coco.loadImgs(img_id)[0]
 
-    m = np.zeros((img_info['height'], img_info['width']))
+    m = np.zeros((img_info['height'], img_info['width']), dtype=np.float32)
 
     for obj in anno:
         if obj['iscrowd']:
-            rle = pycocotools.mask.frPyObjects(obj['segmentation'],
+            rle = xtcocotools.mask.frPyObjects(obj['segmentation'],
                                                img_info['height'],
                                                img_info['width'])
-            m += pycocotools.mask.decode(rle)
+            m += xtcocotools.mask.decode(rle)
         elif obj['num_keypoints'] == 0:
-            rles = pycocotools.mask.frPyObjects(obj['segmentation'],
+            rles = xtcocotools.mask.frPyObjects(obj['segmentation'],
                                                 img_info['height'],
                                                 img_info['width'])
             for rle in rles:
-                m += pycocotools.mask.decode(rle)
+                m += xtcocotools.mask.decode(rle)
 
     return m < 0.5
 
@@ -38,9 +38,11 @@ def _get_joints(anno, ann_info, int_sigma):
     num_people = len(anno)
 
     if ann_info['scale_aware_sigma']:
-        joints = np.zeros((num_people, ann_info['num_joints'], 4))
+        joints = np.zeros((num_people, ann_info['num_joints'], 4),
+                          dtype=np.float32)
     else:
-        joints = np.zeros((num_people, ann_info['num_joints'], 3))
+        joints = np.zeros((num_people, ann_info['num_joints'], 3),
+                          dtype=np.float32)
 
     for i, obj in enumerate(anno):
         joints[i, :ann_info['num_joints'], :3] = \
@@ -71,7 +73,7 @@ def _check_flip(origin_imgs, result_imgs):
 
 def test_bottomup_pipeline():
 
-    data_prefix = 'tests/data/'
+    data_prefix = 'tests/data/coco/'
     ann_file = osp.join(data_prefix, 'test_coco.json')
     coco = COCO(ann_file)
 
@@ -82,8 +84,8 @@ def test_bottomup_pipeline():
         0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15
     ]
 
-    ann_info['use_different_joints_weight'] = False
-    ann_info['joints_weight'] = np.array([
+    ann_info['use_different_joint_weights'] = False
+    ann_info['joint_weights'] = np.array([
         1., 1., 1., 1., 1., 1., 1., 1.2, 1.2, 1.5, 1.5, 1., 1., 1.2, 1.2, 1.5,
         1.5
     ],

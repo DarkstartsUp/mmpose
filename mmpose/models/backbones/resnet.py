@@ -42,7 +42,7 @@ class BasicBlock(nn.Module):
                  with_cp=False,
                  conv_cfg=None,
                  norm_cfg=dict(type='BN')):
-        super(BasicBlock, self).__init__()
+        super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.expansion = expansion
@@ -85,13 +85,16 @@ class BasicBlock(nn.Module):
 
     @property
     def norm1(self):
+        """nn.Module: the normalization layer named "norm1" """
         return getattr(self, self.norm1_name)
 
     @property
     def norm2(self):
+        """nn.Module: the normalization layer named "norm2" """
         return getattr(self, self.norm2_name)
 
     def forward(self, x):
+        """Forward function."""
 
         def _inner_forward(x):
             identity = x
@@ -154,7 +157,7 @@ class Bottleneck(nn.Module):
                  with_cp=False,
                  conv_cfg=None,
                  norm_cfg=dict(type='BN')):
-        super(Bottleneck, self).__init__()
+        super().__init__()
         assert style in ['pytorch', 'caffe']
 
         self.in_channels = in_channels
@@ -215,17 +218,21 @@ class Bottleneck(nn.Module):
 
     @property
     def norm1(self):
+        """nn.Module: the normalization layer named "norm1" """
         return getattr(self, self.norm1_name)
 
     @property
     def norm2(self):
+        """nn.Module: the normalization layer named "norm2" """
         return getattr(self, self.norm2_name)
 
     @property
     def norm3(self):
+        """nn.Module: the normalization layer named "norm3" """
         return getattr(self, self.norm3_name)
 
     def forward(self, x):
+        """Forward function."""
 
         def _inner_forward(x):
             identity = x
@@ -401,7 +408,7 @@ class ResLayer(nn.Sequential):
                     norm_cfg=norm_cfg,
                     **kwargs))
 
-        super(ResLayer, self).__init__(*layers)
+        super().__init__(*layers)
 
 
 @BACKBONES.register_module()
@@ -486,7 +493,7 @@ class ResNet(BaseBackbone):
                  norm_eval=False,
                  with_cp=False,
                  zero_init_residual=True):
-        super(ResNet, self).__init__()
+        super().__init__()
         if depth not in self.arch_settings:
             raise KeyError(f'invalid depth {depth} for resnet')
         self.depth = depth
@@ -544,13 +551,16 @@ class ResNet(BaseBackbone):
         self.feat_dim = res_layer[-1].out_channels
 
     def make_res_layer(self, **kwargs):
+        """Make a ResLayer."""
         return ResLayer(**kwargs)
 
     @property
     def norm1(self):
+        """nn.Module: the normalization layer named "norm1" """
         return getattr(self, self.norm1_name)
 
     def _make_stem_layer(self, in_channels, stem_channels):
+        """Make stem layer."""
         if self.deep_stem:
             self.stem = nn.Sequential(
                 ConvModule(
@@ -596,6 +606,7 @@ class ResNet(BaseBackbone):
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
     def _freeze_stages(self):
+        """Freeze parameters."""
         if self.frozen_stages >= 0:
             if self.deep_stem:
                 self.stem.eval()
@@ -614,7 +625,13 @@ class ResNet(BaseBackbone):
                 param.requires_grad = False
 
     def init_weights(self, pretrained=None):
-        super(ResNet, self).init_weights(pretrained)
+        """Initialize the weights in backbone.
+
+        Args:
+            pretrained (str, optional): Path to pre-trained weights.
+                Defaults to None.
+        """
+        super().init_weights(pretrained)
         if pretrained is None:
             for m in self.modules():
                 if isinstance(m, nn.Conv2d):
@@ -630,6 +647,7 @@ class ResNet(BaseBackbone):
                         constant_init(m.norm2, 0)
 
     def forward(self, x):
+        """Forward function."""
         if self.deep_stem:
             x = self.stem(x)
         else:
@@ -649,7 +667,8 @@ class ResNet(BaseBackbone):
             return tuple(outs)
 
     def train(self, mode=True):
-        super(ResNet, self).train(mode)
+        """Convert the model into training mode."""
+        super().train(mode)
         self._freeze_stages()
         if mode and self.norm_eval:
             for m in self.modules():
@@ -669,5 +688,4 @@ class ResNetV1d(ResNet):
     """
 
     def __init__(self, **kwargs):
-        super(ResNetV1d, self).__init__(
-            deep_stem=True, avg_down=True, **kwargs)
+        super().__init__(deep_stem=True, avg_down=True, **kwargs)

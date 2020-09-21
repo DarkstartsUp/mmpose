@@ -3,8 +3,8 @@ load_from = None
 resume_from = None
 dist_params = dict(backend='nccl')
 workflow = [('train', 1)]
-checkpoint_config = dict(interval=10)
-evaluation = dict(interval=100, metric='mAP')
+checkpoint_config = dict(interval=50)
+evaluation = dict(interval=50, metric='mAP', key_indicator='AP')
 
 optimizer = dict(
     type='Adam',
@@ -85,7 +85,7 @@ model = dict(
         in_channels=32,
         num_joints=17,
         tag_per_joint=True,
-        extra=dict(final_conv_kerne=1, ),
+        extra=dict(final_conv_kernel=1, ),
         num_deconv_layers=1,
         num_deconv_filters=[32],
         num_deconv_kernels=[4],
@@ -150,7 +150,7 @@ train_pipeline = [
         meta_keys=[]),
 ]
 
-valid_pipeline = [
+val_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='BottomUpGetImgSize', test_scale_factor=[1]),
     # dict(type='BottomUpGetImgSize', test_scale_factor=[0.5, 1, 2]),
@@ -174,7 +174,7 @@ valid_pipeline = [
         ]),
 ]
 
-test_pipeline = valid_pipeline
+test_pipeline = val_pipeline
 
 data_root = 'data/coco'
 data = dict(
@@ -191,22 +191,11 @@ data = dict(
         ann_file=f'{data_root}/annotations/person_keypoints_val2017.json',
         img_prefix=f'{data_root}/val2017/',
         data_cfg=data_cfg,
-        pipeline=valid_pipeline),
+        pipeline=val_pipeline),
     test=dict(
         type='BottomUpCocoDataset',
         ann_file=f'{data_root}/annotations/person_keypoints_val2017.json',
         img_prefix=f'{data_root}/val2017/',
         data_cfg=data_cfg,
-        pipeline=valid_pipeline),
-)
-
-loss = dict(
-    type='MultiLossFactory',
-    num_stages=2,
-    ae_loss_type='exp',
-    with_ae_loss=[True, False],
-    push_loss_factor=[0.001, 0.001],
-    pull_loss_factor=[0.001, 0.001],
-    with_heatmaps_loss=[True, True],
-    heatmaps_loss_factor=[1.0, 1.0],
+        pipeline=val_pipeline),
 )

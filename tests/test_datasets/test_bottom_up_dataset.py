@@ -31,9 +31,10 @@ def test_bottom_up_COCO_dataset():
     # Test det bbox
     data_cfg_copy = copy.deepcopy(data_cfg)
     custom_dataset = dataset_class(
-        ann_file='tests/data/test_coco.json',
-        img_prefix='tests/data/',
+        ann_file='tests/data/coco/test_coco.json',
+        img_prefix='tests/data/coco/',
         data_cfg=data_cfg_copy,
         pipeline=[])
 
     assert custom_dataset.num_images == 4
+    _ = custom_dataset[0]

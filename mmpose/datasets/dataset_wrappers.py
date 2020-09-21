@@ -2,7 +2,7 @@ from .registry import DATASETS
 
 
 @DATASETS.register_module()
-class RepeatDataset(object):
+class RepeatDataset:
     """A wrapper of repeated dataset.
 
     The length of repeated dataset will be `times` larger than the original
@@ -22,7 +22,9 @@ class RepeatDataset(object):
         self._ori_len = len(self.dataset)
 
     def __getitem__(self, idx):
+        """Get data."""
         return self.dataset[idx % self._ori_len]
 
     def __len__(self):
+        """Length after repetition."""
         return self.times * self._ori_len
